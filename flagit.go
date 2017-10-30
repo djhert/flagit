@@ -52,7 +52,7 @@ func (f Flag) PrintUsage() {
 }
 
 func (f Flag) PrintUsageOf(s string) {
-	fmt.Println("Usage: ")
+	fmt.Println("Flags: ")
 	for i := range f.availableFlags {
 		if f.availableFlags[i].checkFlag(s) {
 			fmt.Println(f.availableFlags[i].GetFlagAndUsage())
