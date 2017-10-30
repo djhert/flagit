@@ -1,29 +1,20 @@
 package flagit
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 )
 
-type boolFlag struct {
-	value *bool
-	flag  string
-}
-
-type intFlag struct {
-	value *int
-	flag  string
-}
-
-type stringFlag struct {
-	value *string
-	flag  string
-}
+var (
+	ErrNoFlags = errors.New("No flags passed")
+)
 
 type Flag struct {
-	boolFlags   []boolFlag
-	intFlags    []intFlag
-	stringFlags []stringFlag
+	boolFlags      []boolFlag
+	intFlags       []intFlag
+	stringFlags    []stringFlag
+	availableFlags []flagBase
 }
 
 func CreateFlag() *Flag {
@@ -34,67 +25,93 @@ func CreateFlag() *Flag {
 	return f
 }
 
-func (f *Flag) AddBoolFlag(v *bool, flags ...string) {
-	for i := range flags {
-		f.boolFlags = append(f.boolFlags, boolFlag{v, flags[i]})
+func (f *Flag) AddBoolFlag(v *bool, usage string, flags ...string) {
+	f.boolFlags = append(f.boolFlags, createBoolFlag(flags, usage, v))
+	f.addAvailable(flags, usage)
+}
+
+func (f *Flag) AddIntFlag(v *int, usage string, flags ...string) {
+	f.intFlags = append(f.intFlags, createIntFlag(flags, usage, v))
+	f.addAvailable(flags, usage)
+}
+
+func (f *Flag) AddStringFlag(v *string, usage string, flags ...string) {
+	f.stringFlags = append(f.stringFlags, createStringFlag(flags, usage, v))
+	f.addAvailable(flags, usage)
+}
+
+func (f *Flag) addAvailable(flags []string, usage string) {
+	f.availableFlags = append(f.availableFlags, flagBase{flags, usage})
+}
+
+func (f Flag) PrintUsage() {
+	fmt.Println("Usage: ")
+	for i := range f.availableFlags {
+		fmt.Println(f.availableFlags[i].GetFlagAndUsage())
 	}
 }
 
-func (f *Flag) AddIntFlag(v *int, flags ...string) {
-	for i := range flags {
-		f.intFlags = append(f.intFlags, intFlag{v, flags[i]})
+func (f Flag) PrintUsageOf(s string) {
+	fmt.Println("Usage: ")
+	for i := range f.availableFlags {
+		if f.availableFlags[i].checkFlag(s) {
+			fmt.Println(f.availableFlags[i].GetFlagAndUsage())
+			return
+		}
 	}
-}
-
-func (f *Flag) AddStringFlag(v *string, flags ...string) {
-	for i := range flags {
-		f.stringFlags = append(f.stringFlags, stringFlag{v, flags[i]})
-	}
+	fmt.Printf("  Error: %s is not a valid flag\n", s)
 }
 
 func sanitizeFlags(s []string) []string {
 	a := make([]string, 0)
 	for i := range s {
-		if s[i][:1] == "-" && s[i][:2] != "--" {
-			if len(s[i]) == 2 {
-				a = append(a, s[i])
-			} else {
-				a = append(a, s[i][:2])
-				temp := s[i][2:]
-				x := 0
-				for y := x + 1; y <= len(temp); y++ {
-					a = append(a, "-"+temp[x:y])
-					x++
+		if len(s[i]) > 0 {
+			if s[i][:1] == "-" && s[i][:2] != "--" {
+				if len(s[i]) == 2 {
+					a = append(a, s[i])
+				} else {
+					a = append(a, s[i][:2])
+					temp := s[i][2:]
+					x := 0
+					for y := x + 1; y <= len(temp); y++ {
+						a = append(a, "-"+temp[x:y])
+						x++
+					}
 				}
-
+			} else {
+				a = append(a, s[i])
 			}
-
-		} else {
-			a = append(a, s[i])
 		}
 	}
-
 	return a
 }
 
-func (f Flag) ParseFlags(flags []string) error {
+func (f Flag) ParseFlags(flags []string) ([]string, error) {
 	found := false
 	var err error
+	if len(flags) < 1 {
+		return nil, ErrNoFlags
+	}
+	data := make([]string, 0)
 	availFlags := sanitizeFlags(flags)
-	for i := range availFlags {
+	for i := 0; i < len(availFlags); i++ {
 		found = false
+		if availFlags[i][:1] != "-" {
+			data = append(data, availFlags[i])
+			found = true
+		}
 		if !found {
 			for j := range f.intFlags {
-				if availFlags[i] == f.intFlags[j].flag {
+				if f.intFlags[j].checkFlag(availFlags[i]) {
 					if (i + 1) < len(availFlags) {
 						*f.intFlags[j].value, err = strconv.Atoi(availFlags[i+1])
 						if err != nil {
-							return fmt.Errorf("%s is not satisfied by %s", f.intFlags[j].flag, availFlags[i+1])
+							return nil, fmt.Errorf("%s is not satisfied by %s", availFlags[i], availFlags[i+1])
 						}
-						i += 2
+						i++
 						found = true
 					} else {
-						return fmt.Errorf("No value passed into flag %s", f.intFlags[j].flag)
+						return nil, fmt.Errorf("No value passed into flag %s", availFlags[i])
 					}
 				}
 				if found {
@@ -104,16 +121,15 @@ func (f Flag) ParseFlags(flags []string) error {
 		}
 		if !found {
 			for j := range f.stringFlags {
-				if availFlags[i] == f.stringFlags[j].flag {
+				if f.stringFlags[j].checkFlag(availFlags[i]) {
 					if (i + 1) < len(availFlags) {
 						*f.stringFlags[j].value = availFlags[i+1]
 						found = true
-						i += 2
+						i++
 					} else {
-						return fmt.Errorf("No string passed into flag %s", f.stringFlags[j].flag)
+						return nil, fmt.Errorf("No string passed into flag %s", availFlags[i])
 					}
 				}
-
 				if found {
 					break
 				}
@@ -121,7 +137,7 @@ func (f Flag) ParseFlags(flags []string) error {
 		}
 		if !found {
 			for j := range f.boolFlags {
-				if availFlags[i] == f.boolFlags[j].flag {
+				if f.boolFlags[j].checkFlag(availFlags[i]) {
 					*f.boolFlags[j].value = true
 					found = true
 				}
@@ -130,6 +146,9 @@ func (f Flag) ParseFlags(flags []string) error {
 				}
 			}
 		}
+		if !found {
+			return nil, fmt.Errorf("Invalid Flag: %s", availFlags[i])
+		}
 	}
-	return nil
+	return data, nil
 }
