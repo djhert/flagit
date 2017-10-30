@@ -17,7 +17,7 @@ type Flag struct {
 	availableFlags []flagBase
 }
 
-func CreateFlag() *Flag {
+func NewFlag() *Flag {
 	f := new(Flag)
 	f.boolFlags = make([]boolFlag, 0)
 	f.intFlags = make([]intFlag, 0)
@@ -25,17 +25,17 @@ func CreateFlag() *Flag {
 	return f
 }
 
-func (f *Flag) AddBoolFlag(v *bool, usage string, flags ...string) {
+func (f *Flag) Bool(v *bool, flags []string, usage string) {
 	f.boolFlags = append(f.boolFlags, createBoolFlag(flags, usage, v))
 	f.addAvailable(flags, usage)
 }
 
-func (f *Flag) AddIntFlag(v *int, usage string, flags ...string) {
+func (f *Flag) Int(v *int, flags []string, usage string) {
 	f.intFlags = append(f.intFlags, createIntFlag(flags, usage, v))
 	f.addAvailable(flags, usage)
 }
 
-func (f *Flag) AddStringFlag(v *string, usage string, flags ...string) {
+func (f *Flag) String(v *string, flags []string, usage string) {
 	f.stringFlags = append(f.stringFlags, createStringFlag(flags, usage, v))
 	f.addAvailable(flags, usage)
 }
@@ -45,7 +45,7 @@ func (f *Flag) addAvailable(flags []string, usage string) {
 }
 
 func (f Flag) PrintUsage() {
-	fmt.Println("Usage: ")
+	fmt.Println("Flags: ")
 	for i := range f.availableFlags {
 		fmt.Println(f.availableFlags[i].GetFlagAndUsage())
 	}
@@ -86,7 +86,7 @@ func sanitizeFlags(s []string) []string {
 	return a
 }
 
-func (f Flag) ParseFlags(flags []string) ([]string, error) {
+func (f Flag) Parse(flags []string) ([]string, error) {
 	found := false
 	var err error
 	if len(flags) < 1 {

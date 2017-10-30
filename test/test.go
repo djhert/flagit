@@ -12,11 +12,11 @@ func main() {
 	val := 128
 	temp := "default"
 
-	flags := new(flagit.Flag)
-	flags.AddBoolFlag(&printAll, "Should I print all of the flag test data", "-a")
-	flags.AddBoolFlag(&verbose, "Boolean Flag: if flagged then set to true", "-b", "--boolean")
-	flags.AddIntFlag(&val, "Integer Flag: next value expected to be integer", "-i", "--integer")
-	flags.AddStringFlag(&temp, "String Flag: next value expected to be string", "-s", "--string")
+	flags := flagit.NewFlag()
+	flags.Bool(&printAll, []string{"-a"}, "Should I print all of the flag test data")
+	flags.Bool(&verbose, []string{"-b", "--boolean"}, "Boolean Flag: if flagged then set to true")
+	flags.Int(&val, []string{"-i", "--integer", "-c"}, "Integer Flag: next value expected to be integer")
+	flags.String(&temp, []string{"-s", "--string"}, "String Flag: next value expected to be string")
 
 	fmt.Println()
 	fmt.Println("Start Value:")
@@ -24,7 +24,7 @@ func main() {
 	fmt.Println("  Integer: ", val)
 	fmt.Println("  String: ", temp)
 
-	data, err := flags.ParseFlags(os.Args[1:])
+	data, err := flags.Parse(os.Args[1:])
 	if err == flagit.ErrNoFlags {
 		fmt.Println("No flags passed!")
 	} else if err != nil {
